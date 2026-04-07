@@ -361,7 +361,7 @@ p4 = make.density.plot(exp.data,   "Exponential")
 (p1 | p2) / (p3 | p4) #Combine plots
 ```
 
-All four ditributions appear to be slightly right skewed (even the normal distribution). This makes sense due to the observed underestimation in the data (negative bias). The skewness is especially apparent in the exponential distribution, which makes sense as it  is naturally right-skewed. 
+All four ditributions appear to be slightly right skewed (even the normal distribution). This indicates that the skewness is a property of the variance estimators themselves rather than the original data distribution. While S_n^2 is slightly shifted to the left due to its negative bias, both estimators show similar overall shapes. As the sample size increases, these distributions would be expected to become more symmetric and concentrated around the true variance (2). 
 
 ## Bootstrap
 Now, take *one* sample from each distribution. Instead of drawing a random sample at each iteration, sample *with replacement* from the one sample. Produce a density plot of the $s_{n-1}^2$ and $s_{n}^2$. Do we get roughly the same information as we do in the full simulation? Try this over several seeds -- what do you notice? Ensure to set your randomization seed.
