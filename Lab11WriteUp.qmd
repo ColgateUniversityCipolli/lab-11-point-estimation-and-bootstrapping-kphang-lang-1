@@ -105,15 +105,316 @@ Create a plot or combination of plots (using patchwork) to show the results acro
 \textrm{Mean Square Error} &= \textrm{Bias}^2 + \textrm{Variance of Estimates}.
 \end{align*}
 
+**Solution**
+```{r}
+set.seed(7272)
+
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+
+simulate.variance = function(generator.fn, n, n.sim = 1000) {
+  s_n1 = numeric(n.sim)
+  s_n  = numeric(n.sim)
+  
+  for (i in 1:n.sim) {
+    x = generator.fn(n)
+    
+    s_n1[i] = var(x)                 # S_(n-1)^2
+    s_n[i]  = mean((x - mean(x))^2) # S_n^2
+  }
+  
+  tibble(s_n1 = s_n1, s_n = s_n)
+}
+```
+
+```{r}
+#Generate data for each distribution
+gen.pois  = function(n) rpois(n, 2)
+gen.binom = function(n) rbinom(n, 50, (5 - sqrt(21))/10)
+gen.norm  = function(n) rnorm(n, 0, sqrt(2))
+gen.exp   = function(n) rexp(n, rate = 1/sqrt(2))
+
+#Simulations when n = 20
+n = 20
+
+pois.data  = simulate.variance(gen.pois, n)
+binom.data = simulate.variance(gen.binom, n)
+norm.data  = simulate.variance(gen.norm, n)
+exp.data   = simulate.variance(gen.exp, n)
+```
+
+```{r}
+#Summary Function
+summarize.results = function(data, dist.name) {
+  true.var = 2
+  
+  tibble(
+    Distribution = dist.name,
+    Estimator = c("S_{n-1}^2", "S_n^2"),
+    Bias = c(mean(data$s_n1) - true.var,
+             mean(data$s_n)  - true.var),
+    Variance = c(var(data$s_n1),
+                 var(data$s_n)),
+    Precision = c(1 / var(data$s_n1),
+                  1 / var(data$s_n)),
+    MSE = c(
+      (mean(data$s_n1) - true.var)^2 + var(data$s_n1),
+      (mean(data$s_n)  - true.var)^2 + var(data$s_n)
+    )
+  )
+}
+```
+
+```{r}
+#| label: tbl-diff-variance-estimators
+#| tbl-cap: "Comparison of Variance Estimators Using Bias, Variance, Precision, and MSE"
+#| tbl-align: "center"
+#| size: scriptsize
+
+results.table = bind_rows( 
+  summarize.results(pois.data,  "Poisson"),
+  summarize.results(binom.data, "Binomial"),
+  summarize.results(norm.data,  "Normal"),
+  summarize.results(exp.data,   "Exponential")
+) 
+results.table |>
+   knitr::kable(digits = 2)
+```
+
+```{r}
+#| label: fig-comp-variance-estimators
+#| fig-cap: "Comparison of Variance Estimators (n = 20)"
+#| fig-width: 10
+#| fig-height: 5
+#| scale: "80%"
+#| fig-align: "center"
+#| size: scriptsize
+
+#Plot Function
+make.plot = function(sim.data, title) {
+  df.plot = tibble(
+    value = c(sim.data$s_n1, sim.data$s_n),
+    estimator = rep(c("S_(n-1)^2", "S_n^2"), each = nrow(sim.data))
+  )
+ #Plot 
+  ggplot(df.plot, aes(x = value, fill = estimator)) +
+    geom_density(alpha = 0.5) +
+    geom_vline(xintercept = 2, linetype = "dashed") +
+    labs(x = "Estimated Variance") +
+    theme_bw()
+}
+
+p1 = make.plot(pois.data,  "Poisson(λ = 2)")
+p2 = make.plot(binom.data, "Binomial(n=50, p=(5-√21)/10)")
+p3 = make.plot(norm.data,  "Normal(0, √2)")
+p4 = make.plot(exp.data,   "Exponential(λ = 1/√2)")
+
+# Combine plots
+(p1 | p2) / (p3 | p4) 
+```
+
+Across all four distributions, S_(n-1)^2 is approximately unbiased (-0.04 to 0) while S_n^2 shows systematically more bias and no significant differences in variance, precision, or MSE.
+
 ## Simulation over various sample sizes
 Consider the effect of the sample size have on these results. Provide a graphical and numerical summary of what happens as $n$ increases -- say $n=20$, $n=50$, $n=100$, and $n=500$. Does the result in your initial simulation hold across samples? Or, do things change as the sample size changes? Ensure to set your randomization seed.
- 
+
+**Solution**
+```{r}
+set.seed(7272)
+sample.sizes = c(20, 50, 100, 500)
+
+summarize.results.n = function(data, dist.name, n) {
+  true.var = 2
+  
+  tibble(
+    Distribution = dist.name,
+    n = n,
+    Estimator = c("S_(n-1)^2", "S_n^2"),
+    Bias = c(mean(data$s_n1) - true.var,
+             mean(data$s_n)  - true.var),
+    Variance = c(var(data$s_n1),
+                 var(data$s_n)),
+    Precision = c(1 / var(data$s_n1),
+                  1 / var(data$s_n)),
+    MSE = c(
+      (mean(data$s_n1) - true.var)^2 + var(data$s_n1),
+      (mean(data$s_n)  - true.var)^2 + var(data$s_n)
+    )
+  )
+}
+```
+
+```{r}
+#| label: tbl-diff-variance-estimators-over-sample-sizes
+#| tbl-cap: "Bias, Variance, Precision, MSE of Variance Estimators across Sample Sizes"
+#| tbl-align: "center"
+#| size: scriptsize
+
+all.results = list()
+
+for (n in sample.sizes) {
+  pois.data  = simulate.variance(gen.pois, n)
+  binom.data = simulate.variance(gen.binom, n)
+  norm.data  = simulate.variance(gen.norm, n)
+  exp.data   = simulate.variance(gen.exp, n)
+
+all.results[[as.character(n)]] = bind_rows( 
+  summarize.results.n(pois.data,  "Poisson", n),
+  summarize.results.n(binom.data, "Binomial", n),
+  summarize.results.n(norm.data,  "Normal", n),
+  summarize.results.n(exp.data,   "Exponential", n)
+) 
+}
+results.all.n = bind_rows(all.results)
+
+results.all.n |>
+   knitr::kable(digits = 2)
+```
+
+```{r}
+#| label: fig-mse-variance-estimators-diff-n
+#| fig-cap: "MSE of Variance Estimators vs Sample Size"
+#| fig-width: 10
+#| fig-height: 5
+#| scale: "80%"
+#| fig-align: "center"
+#| size: scriptsize
+
+ggplot(results.all.n, aes(x = n, y = MSE, color = Estimator)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ Distribution) +
+  labs(x = "Sample Size (n)") +
+  theme_bw()
+```
+
+```{r}
+#| label: fig-bias-diff-n
+#| fig-cap: "Bias vs Sample Size"
+#| fig-width: 10
+#| fig-height: 5
+#| scale: "80%"
+#| fig-align: "center"
+#| size: scriptsize
+
+ggplot(results.all.n, aes(x = n, y = Bias, color = Estimator)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ Distribution) +
+  labs(x = "Sample Size (n)") +
+  theme_bw()
+```
+
+As the sample size increases, bias for S_n^2 dcreases, while S_(n-1)^2 remains unbiased. It is especially noticeable that bias is approximately 0 for all n=500 samples. Variance and MSE also decreased for both as sample size increased, and precision increased. As sample size increases, it is less apparent which estimator is better. However, across sample sizes S_n^2 systematically underestimates the true variance, whereas S_(n-1)^2 does not.
+
 ## Simulation
 You have written code to draw a random sample of various sizes from each distribution, and to calculate and store the calculated estimates. Rework your code to produce a density plot of the $s_{n-1}^2$ and $s_{n}^2$. Do you have a guess about their distribution? Ensure to set your randomization seed. 
+
+**Solution**
+```{r}
+set.seed(7272)
+
+n = 50 #random n
+
+pois.data  = simulate.variance(gen.pois, n)
+binom.data = simulate.variance(gen.binom, n)
+norm.data  = simulate.variance(gen.norm, n)
+exp.data   = simulate.variance(gen.exp, n)
+```
+
+```{r}
+make.density.plot = function(sim.data, title) {
+  df.plot = tibble(
+    value = c(sim.data$s_n1, sim.data$s_n),
+    estimator = rep(c("S_(n-1)^2", "S_n^2"), each = nrow(sim.data))
+  )
+  
+  ggplot(df.plot, aes(x = value, fill = estimator)) +
+    geom_density(alpha = 0.5) +
+    geom_vline(xintercept = 2, linetype = "dashed") +
+    labs(title = title, x = "Estimated Variance") +
+    theme_bw()
+}
+```
+
+```{r}
+#| label: fig-sampling-distr-of-variance-estimators
+#| fig-cap: "Sampling Distributions of Variance Estimators"
+#| fig-width: 10
+#| fig-height: 5
+#| scale: "80%"
+#| fig-align: "center"
+#| size: scriptsize
+
+library(patchwork)
+
+p1 = make.density.plot(pois.data,  "Poisson")
+p2 = make.density.plot(binom.data, "Binomial")
+p3 = make.density.plot(norm.data,  "Normal")
+p4 = make.density.plot(exp.data,   "Exponential")
+
+(p1 | p2) / (p3 | p4) 
+```
+
+All four ditributions appear to be slightly right skewed (even the normal distribution). This makes sense due to the observed underestimation in the data (negative bias). The skewness is especially apparent in the exponential distribution, which makes sense as it  is naturally right-skewed. 
 
 ## Bootstrap
 Now, take *one* sample from each distribution. Instead of drawing a random sample at each iteration, sample *with replacement* from the one sample. Produce a density plot of the $s_{n-1}^2$ and $s_{n}^2$. Do we get roughly the same information as we do in the full simulation? Try this over several seeds -- what do you notice? Ensure to set your randomization seed.
 
+**Solution**
+```{r}
+#Create bootstrap function
+bootstrap.variance = function(x, n.boot = 1000) { 
+  n = length(x)
+  
+  s_n1 = numeric(n.boot)
+  s_n  = numeric(n.boot)
+  
+  for (i in 1:n.boot) { #loop sample
+    x.sample = sample(x, size = n, replace = TRUE)  # bootstrap sample (replacement)
+    
+    s_n1[i] = var(x.sample)
+    s_n[i]  = mean((x.sample - mean(x.sample))^2)
+  }
+  
+  tibble(s_n1 = s_n1, s_n = s_n)
+}
+```
+
+```{r}
+#Take one random sample from each distribution
+set.seed(7272)
+
+n = 50
+
+x.pois  = rpois(n, 2)
+x.binom = rbinom(n, 50, (5 - sqrt(21))/10)
+x.norm  = rnorm(n, 0, sqrt(2))
+x.exp   = rexp(n, rate = 1/sqrt(2))
+
+pois.boot  = bootstrap.variance(x.pois)
+binom.boot = bootstrap.variance(x.binom)
+norm.boot  = bootstrap.variance(x.norm)
+exp.boot   = bootstrap.variance(x.exp)
+```
+
+```{r}
+#| label: fig-bootstrap
+#| fig-cap: "Sampling Distributions of Variance Estimators Using Bootstrapping"
+#| fig-width: 10
+#| fig-height: 5
+#| scale: "80%"
+#| fig-align: "center"
+#| size: scriptsize
+
+p1 = make.density.plot(pois.boot,  "Poisson (Bootstrap)")
+p2 = make.density.plot(binom.boot, "Binomial (Bootstrap)")
+p3 = make.density.plot(norm.boot,  "Normal (Bootstrap)")
+p4 = make.density.plot(exp.boot,   "Exponential (Bootstrap)")
+
+(p1 | p2) / (p3 | p4)
+```
 
 # Executive Summary
 Summarize the work you've done here to provide a brief (200-300 word) summary of the simulation and the results using your work in Lab 11. Your summary should be professional, clear, and all claims should be corroborated with statistical support.
