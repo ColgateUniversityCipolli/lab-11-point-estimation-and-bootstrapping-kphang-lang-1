@@ -113,6 +113,7 @@ library(ggplot2)
 library(dplyr)
 library(patchwork)
 
+#Simulation Function
 simulate.variance = function(generator.fn, n, n.sim = 1000) {
   s_n1 = numeric(n.sim)
   s_n  = numeric(n.sim)
@@ -222,7 +223,7 @@ Consider the effect of the sample size have on these results. Provide a graphica
 **Solution**
 ```{r}
 set.seed(7272)
-sample.sizes = c(20, 50, 100, 500)
+sample.sizes = c(20, 50, 100, 500) #store sample sizes in a vector
 
 summarize.results.n = function(data, dist.name, n) {
   true.var = 2
@@ -253,6 +254,7 @@ summarize.results.n = function(data, dist.name, n) {
 
 all.results = list()
 
+#loop simulation function over sample sizes
 for (n in sample.sizes) {
   pois.data  = simulate.variance(gen.pois, n)
   binom.data = simulate.variance(gen.binom, n)
@@ -301,7 +303,7 @@ ggplot(results.all.n, aes(x = n, y = MSE, color = Estimator)) +
 ggplot(results.all.n, aes(x = n, y = Bias, color = Estimator)) +
   geom_line() +
   geom_point() +
-  facet_wrap(~ Distribution) +
+  facet_wrap(~ Distribution) + #facet by distribution
   labs(x = "Sample Size (n)") +
   theme_bw()
 ```
@@ -324,12 +326,14 @@ exp.data   = simulate.variance(gen.exp, n)
 ```
 
 ```{r}
+#Plot function
 make.density.plot = function(sim.data, title) {
   df.plot = tibble(
     value = c(sim.data$s_n1, sim.data$s_n),
     estimator = rep(c("S_(n-1)^2", "S_n^2"), each = nrow(sim.data))
   )
-  
+
+#Plot
   ggplot(df.plot, aes(x = value, fill = estimator)) +
     geom_density(alpha = 0.5) +
     geom_vline(xintercept = 2, linetype = "dashed") +
@@ -354,7 +358,7 @@ p2 = make.density.plot(binom.data, "Binomial")
 p3 = make.density.plot(norm.data,  "Normal")
 p4 = make.density.plot(exp.data,   "Exponential")
 
-(p1 | p2) / (p3 | p4) 
+(p1 | p2) / (p3 | p4) #Combine plots
 ```
 
 All four ditributions appear to be slightly right skewed (even the normal distribution). This makes sense due to the observed underestimation in the data (negative bias). The skewness is especially apparent in the exponential distribution, which makes sense as it  is naturally right-skewed. 
@@ -413,8 +417,18 @@ p2 = make.density.plot(binom.boot, "Binomial (Bootstrap)")
 p3 = make.density.plot(norm.boot,  "Normal (Bootstrap)")
 p4 = make.density.plot(exp.boot,   "Exponential (Bootstrap)")
 
-(p1 | p2) / (p3 | p4)
+(p1 | p2) / (p3 | p4) #combine plots
 ```
+
+The bootstrap distributions of S_(n-1)^2 and S_n^2 have similar shapes to those observed in the full simulation, including right-skewness and decreasing spread. This supports that bootstrapping is a useful method for approximating the sampling distribution using only one sample. However, the bootstrap distributions are centered around the sample variance rather than the population variance, so results can vary depending on the initial sample. When using different seeds, the overall shape remains similar, but the location and spread may change, reflecting variability in the original samples.
 
 # Executive Summary
 Summarize the work you've done here to provide a brief (200-300 word) summary of the simulation and the results using your work in Lab 11. Your summary should be professional, clear, and all claims should be corroborated with statistical support.
+
+**Solution**
+This lab investigated the properties of two variance estimators, S_(n-1)^2 and S_n^2, through simulation and bootstrapping across four distributions. Using the Poisson, Binomial, Normal, and Exponential models, which were all parameterized to have true variance 2, I repeatedly generated samples and computed both estimators. The results consistently showed that S_(n-1)^2 is approximately unbiased, with mean estimates very close to the true value of 2, while S_n^2 systematically underestimates the true variance. This bias was evident in the simulation summaries and density plots, where the distribution of S_n^2 was shifted slightly left of 2.
+
+As sample size increased from n=20 to n=500, the variance and MSE of both estimators decreased, indicating improved precision. While the bias of S_n^2 diminished with larger n, it remained consistently negative. Consequently, the difference in performance between the two estimators was negligible for larger samples, though S_(n-1)^2 was unbiased for all sample sizes and did not exhibit persistent negative bias like S_n^2 did.
+
+Density plots revealed that both estimators have right-skewed sampling distributions for small 
+n, becoming more symmetric as n increases. Bootstrapping from a single sample produced similar distributional shapes, demonstrating that resampling can approximate the sampling distribution. However, bootstrap results were centered around the sample variance and varied across seeds, reflecting differences in the initial samples and potential inaccuracy with respect to the overall data. Overall, the simulations confirm the stated preference of using S_(n-1)^2, especially in smaller samples.
